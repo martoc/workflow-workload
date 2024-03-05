@@ -16,6 +16,10 @@ on:
       workload-type:
         required: true
         type: string
+      workload-type-ref:
+        required: false
+        default: main
+        type: string
 
 jobs:
   build:
@@ -76,7 +80,7 @@ jobs:
         with:
           repository: martoc/cloudformation-${{ inputs.workload-type }}
           path: ./cloudformation-template
-          ref: test
+          ref: ${{ inputs.workload-type-ref }}
           token: ${{ secrets.PERSONAL_GITHUB_TOKEN }}
       - name: Cloudformation Customisations
         run: |
