@@ -1,5 +1,21 @@
 on:
   workflow_call:
+    inputs:
+      region:
+        required: true
+        type: string
+      environment:
+        required: true
+        type: string
+      container-registry-namespace:
+        required: false
+        type: string
+      workload-name:
+        required: true
+        type: string
+      workload-type:
+        required: true
+        type: string
 
 jobs:
   build:
@@ -59,7 +75,7 @@ jobs:
       - name: Checkout Cloudformation Template
         uses: actions/checkout@v4
         with:
-          repository: martoc/cloudformation-ec2
+          repository: martoc/cloudformation-${{ inputs.workload-type }}
           path: ./cloudformation-template
           ref: test
           token: ${{ secrets.PERSONAL_GITHUB_TOKEN }}
@@ -76,13 +92,16 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           role-session-name: github-actions
-          aws-region: ${{ env.REGION }}
+          aws-region: ${{ inputs.region }}
       - name: Deploy to AWS
         shell: bash
         run: |
           # Set environment variables
-          REGION="${{ env.REGION }}"
+          REGION="${{ inputs.region }}"
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text --region $REGION)
+          ENVIRONMENT="${{ inputs.environment }}"
+          WORKLOAD_NAME="${{ inputs.workload-name }}"
+          CONTAINER_NAMESPACE="${{ inputs.container-registry-namespace }}"
           echo "AWS Account ID: $ACCOUNT_ID"
           echo "AWS Region: $REGION"
 
@@ -91,7 +110,7 @@ jobs:
           echo "Workload Version: $TAG_VERSION"
 
           # ECR Distribution
-          IMAGE_NAME="$ORG/$WORKLOAD_NAME"
+          IMAGE_NAME="$CONTAINER_NAMESPACE/$WORKLOAD_NAME"
           REPOSITORY_EXISTS=$(aws ecr describe-repositories --repository-names $IMAGE_NAME --region $REGION 2>/dev/null || echo "")
           if [ -z "$REPOSITORY_EXISTS" ]; then
               echo "Repository does not exist. Creating $IMAGE_NAME in $REGION..."
