@@ -1,0 +1,119 @@
+on:
+  workflow_call:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 10
+          fetch-tags: true
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Tag
+        uses: martoc/action-tag@main
+      - name: Init Build
+        run: npm install
+      - name: Build
+        run: npm run build
+      - name: Build Container
+        uses: martoc/action-container-build@main
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Release on GitHub
+        uses: martoc/action-release@main
+      - name: Set up shared environment variables
+        run: |
+          set | grep TAG_ > shared-envars.sh
+          cat shared-envars.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shared-envars
+          path: shared-envars.sh
+  deploy:
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: shared-envars
+          path: .
+      - name: Setup environment variables
+        run: |
+          cat shared-envars.sh >> "$GITHUB_ENV"
+          cat shared-envars.sh
+          source shared-envars.sh
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Checkout Cloudformation Template
+        uses: actions/checkout@v4
+        with:
+          repository: martoc/cloudformation-${{ env.WORKLOAD_TYPE }}
+          path: ./cloudformation-template
+          ref: test
+          token: ${{ secrets.PERSONAL_GITHUB_TOKEN }}
+      - name: Cloudformation Customisations
+        run: |
+          if [ -f "cloudformation-template/src/scripts/customise.sh" ]; then
+              ./cloudformation-template/src/scripts/customise.sh
+          else
+              echo "./cloudformation-template/src/scripts/customise.sh not found"
+          fi
+          cat cloudformation-template/src/cloudformation/main.yaml
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          role-session-name: github-actions
+          aws-region: ${{ env.REGION }}
+      - name: Deploy to AWS
+        shell: bash
+        run: |
+          # Set environment variables
+          REGION="${{ env.REGION }}"
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text --region $REGION)
+          echo "AWS Account ID: $ACCOUNT_ID"
+          echo "AWS Region: $REGION"
+
+          echo "Workload Environment: $ENVIRONMENT"
+          echo "Workload Name: $WORKLOAD_NAME"
+          echo "Workload Version: $TAG_VERSION"
+
+          # ECR Distribution
+          IMAGE_NAME="$ORG/$WORKLOAD_NAME"
+          REPOSITORY_EXISTS=$(aws ecr describe-repositories --repository-names $IMAGE_NAME --region $REGION 2>/dev/null || echo "")
+          if [ -z "$REPOSITORY_EXISTS" ]; then
+              echo "Repository does not exist. Creating $IMAGE_NAME in $REGION..."
+              aws ecr create-repository --repository-name $IMAGE_NAME --region $REGION
+              echo "Repository for image $IMAGE_NAME created successfully."
+          else
+              echo "Repository for image $IMAGE_NAME already exists."
+          fi
+          docker login --username AWS --password $(aws ecr get-login-password --region $REGION) $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com
+          docker pull $IMAGE_NAME:$TAG_VERSION
+          IMAGE_ID=$(docker inspect -f '{{.Id}}' $IMAGE_NAME:$TAG_VERSION)
+          docker tag $IMAGE_ID $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$IMAGE_NAME:$TAG_VERSION
+          docker tag $IMAGE_ID $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$IMAGE_NAME:latest
+          docker push $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$IMAGE_NAME:$TAG_VERSION
+          docker push $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$IMAGE_NAME:latest
+
+          # Cloudformation deployment
+          jq ".Parameters.Version = \"$TAG_VERSION\"" etc/cloud/aws/$ACCOUNT_ID/$REGION/$ENVIRONMENT/parameters.json > params-1.json
+          jq ".Parameters.Environment = \"$ENVIRONMENT\"" params-1.json > params.json
+          aws cloudformation deploy --stack-name "$WORKLOAD_NAME-$ENVIRONMENT" \
+            --template-file cloudformation-template/src/cloudformation/main.yaml \
+            --parameter-overrides file://params.json \
+            --region $REGION \
+            --capabilities CAPABILITY_IAM
+          aws cloudformation describe-stack-events --stack-name "$WORKLOAD_NAME-$ENVIRONMENT" --region $REGION
+
