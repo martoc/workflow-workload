@@ -78,7 +78,6 @@ jobs:
         run: |
           cat shared-envars.sh >> "$GITHUB_ENV"
           cat shared-envars.sh
-          echo "WORKLOAD_TYPE=$WORKLOAD_TYPE"
           source shared-envars.sh
       - name: Checkout
         uses: actions/checkout@v4
@@ -87,7 +86,7 @@ jobs:
         with:
           repository: martoc/cloudformation-${{ inputs.workload-type }}
           path: ./cloudformation-template
-          ref: test
+          ref: main
           token: ${{ secrets.PERSONAL_GITHUB_TOKEN }}
       - name: Cloudformation Customisations
         run: |

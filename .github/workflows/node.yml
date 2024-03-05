@@ -68,7 +68,6 @@ jobs:
         run: |
           cat shared-envars.sh >> "$GITHUB_ENV"
           cat shared-envars.sh
-          echo "WORKLOAD_TYPE=$WORKLOAD_TYPE"
           source shared-envars.sh
       - name: Checkout
         uses: actions/checkout@v4
