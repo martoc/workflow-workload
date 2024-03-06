@@ -39,7 +39,7 @@ jobs:
       - name: Tag
         uses: martoc/action-tag@main
       - name: Init Build
-        run: npm install
+        run: npm run init
       - name: Build
         run: npm run build
       - name: Build Container
