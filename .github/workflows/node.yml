@@ -38,6 +38,12 @@ jobs:
           node-version: '20'
       - name: Tag
         uses: martoc/action-tag@main
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          role-session-name: github-actions
+          aws-region: ${{ inputs.region }}
       - name: Init Build
         run: npm run init
       - name: Build
