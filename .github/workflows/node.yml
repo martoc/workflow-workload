@@ -50,12 +50,12 @@ jobs:
       - name: Build
         run: npm run build
       - name: Build Container
-        uses: martoc/action-container-build@main
+        uses: martoc/action-container-build@v0
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       - name: Release on GitHub
-        uses: martoc/action-release@main
+        uses: martoc/action-release@v0
       - name: Set up shared environment variables
         run: |
           set | grep TAG_ > shared-envars.sh
@@ -103,7 +103,7 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           role-session-name: github-actions
           aws-region: ${{ inputs.region }}
-      - uses: martoc/action-deploy@main
+      - uses: martoc/action-deploy@v0
         with:
           region: ${{ inputs.region }}
           environment: ${{ inputs.environment }}
