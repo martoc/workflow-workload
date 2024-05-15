@@ -20,6 +20,7 @@ on:
         required: false
         default: main
         type: string
+
 jobs:
   build:
     runs-on: ubuntu-22.04
