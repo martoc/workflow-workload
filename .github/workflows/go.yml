@@ -76,6 +76,7 @@ jobs:
           path: shared-envars.sh
   deploy:
     needs: build
+    if: ${{ github.event_name != 'pull_request' }}
     runs-on: ubuntu-22.04
     permissions:
       contents: read
