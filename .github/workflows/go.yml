@@ -34,7 +34,7 @@ jobs:
           fetch-depth: 10
           fetch-tags: true
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: '1.21.0'
       - name: Tag
