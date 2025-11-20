@@ -29,7 +29,7 @@ jobs:
       id-token: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 10
           fetch-tags: true
@@ -81,9 +81,9 @@ jobs:
           cat shared-envars.sh
           source shared-envars.sh
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Checkout Cloudformation Template
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: martoc/cloudformation-${{ inputs.workload-type }}
           path: ./cloudformation-template
